@@ -12,7 +12,7 @@ export interface ApifyRunResponse {
   }
 }
 
-export async function scrapeFacebook AdLibrary(
+export async function scrapeFacebookAdLibrary(
   env: Env,
   sourceUrl: string,
   maxAds: number = 20
