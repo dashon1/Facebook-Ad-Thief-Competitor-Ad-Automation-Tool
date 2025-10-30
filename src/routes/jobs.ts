@@ -7,59 +7,32 @@ import { processJob } from '../lib/processor'
 const jobs = new Hono<{ Bindings: Env }>()
 
 /**
- * POST /api/jobs - Create a new job
+ * POST /api/jobs
+ * Create a new job
  */
 jobs.post('/', async (c) => {
   try {
     const body = await c.req.json<CreateJobRequest>()
 
-    // Validate request
+    // Validate input
     if (!body.sourceUrl || !body.productImage) {
-      return c.json({ error: 'Missing required fields: sourceUrl, productImage' }, 400)
+      return c.json({ error: 'Missing required fields: sourceUrl and productImage' }, 400)
     }
 
     // Validate Facebook Ad Library URL
-    const fbAdLibraryPattern = /facebook\.com\/ads\/library/i
-    if (!fbAdLibraryPattern.test(body.sourceUrl)) {
-      return c.json({ error: 'Invalid Facebook Ad Library URL. Must contain "facebook.com/ads/library"' }, 400)
+    if (!body.sourceUrl.includes('facebook.com/ads/library')) {
+      return c.json({ error: 'Invalid Facebook Ad Library URL' }, 400)
     }
 
     const env = c.env
     const supabase = getSupabaseAdminClient(env)
 
-    // Generate job ID
-    const jobId = crypto.randomUUID()
-
-    // Upload product image first (we need the URL before creating the job)
-    let productImageUrl = ''
-    
-    try {
-      // If productImage is a base64 string, upload it
-      if (body.productImage.startsWith('data:image')) {
-        // Extract base64 data from data URL
-        const base64Data = body.productImage.split(',')[1]
-        const { url } = await uploadProductImage(env, jobId, base64Data)
-        productImageUrl = url
-      } else if (body.productImage.startsWith('http')) {
-        // If it's already a URL, use it directly
-        productImageUrl = body.productImage
-      } else {
-        // Assume it's raw base64
-        const { url } = await uploadProductImage(env, jobId, body.productImage)
-        productImageUrl = url
-      }
-    } catch (uploadError: any) {
-      console.error('Product image upload failed:', uploadError)
-      return c.json({ error: `Failed to upload product image: ${uploadError.message}` }, 500)
-    }
-
     // Create job record
     const { data: job, error: jobError } = await supabase
       .from('jobs')
       .insert({
-        id: jobId,
         source_url: body.sourceUrl,
-        product_image_url: productImageUrl,
+        product_image_url: 'pending', // Will be updated after upload
         brand_name: body.brandName || 'Your Brand',
         max_ads: body.maxAds || parseInt(env.MAX_ADS_PER_JOB || '20'),
         batch_size: body.batchSize || parseInt(env.DEFAULT_BATCH_SIZE || '5'),
@@ -68,17 +41,40 @@ jobs.post('/', async (c) => {
       .select()
       .single()
 
-    if (jobError) {
-      console.error('Job creation error:', jobError)
-      return c.json({ error: `Failed to create job: ${jobError.message}` }, 500)
+    if (jobError || !job) {
+      console.error('Failed to create job:', jobError)
+      return c.json({ error: 'Failed to create job' }, 500)
+    }
+
+    // Upload product image
+    let productImageUrl = ''
+    try {
+      // Remove base64 prefix if present
+      let base64Data = body.productImage
+      if (base64Data.includes(',')) {
+        base64Data = base64Data.split(',')[1]
+      }
+
+      const { url } = await uploadProductImage(env, job.id, base64Data)
+      productImageUrl = url
+
+      // Update job with product image URL
+      await supabase
+        .from('jobs')
+        .update({ product_image_url: productImageUrl })
+        .eq('id', job.id)
+    } catch (uploadError: any) {
+      console.error('Failed to upload product image:', uploadError)
+      // Delete job if upload fails
+      await supabase.from('jobs').delete().eq('id', job.id)
+      return c.json({ error: 'Failed to upload product image: ' + uploadError.message }, 500)
     }
 
     // Start processing asynchronously
-    // In production, this would be sent to Cloudflare Queue
-    // For now, we'll use a simple async call with error handling
+    // Using c.executionCtx.waitUntil for Cloudflare Workers
     c.executionCtx.waitUntil(
-      processJob(env, jobId).catch((error) => {
-        console.error(`Job ${jobId} processing error:`, error)
+      processJob(env, job.id).catch(error => {
+        console.error('Job processing error:', error)
       })
     )
 
@@ -88,15 +84,15 @@ jobs.post('/', async (c) => {
     }
 
     return c.json(response, 201)
-
   } catch (error: any) {
-    console.error('Job creation endpoint error:', error)
-    return c.json({ error: error.message || 'Internal server error' }, 500)
+    console.error('Error creating job:', error)
+    return c.json({ error: 'Internal server error: ' + error.message }, 500)
   }
 })
 
 /**
- * GET /api/jobs/:id - Get job status and details
+ * GET /api/jobs/:id
+ * Get job status and details
  */
 jobs.get('/:id', async (c) => {
   try {
@@ -104,15 +100,10 @@ jobs.get('/:id', async (c) => {
     const env = c.env
     const supabase = getSupabaseAdminClient(env)
 
-    // Get job with related data
+    // Get job details
     const { data: job, error: jobError } = await supabase
       .from('jobs')
-      .select(`
-        *,
-        scraped_ads:scraped_ads(*),
-        assets:assets(*),
-        events:events(*)
-      `)
+      .select('*')
       .eq('id', jobId)
       .single()
 
@@ -120,25 +111,45 @@ jobs.get('/:id', async (c) => {
       return c.json({ error: 'Job not found' }, 404)
     }
 
-    // Sort events by created_at desc (most recent first)
-    if (job.events) {
-      job.events.sort((a: any, b: any) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )
-      // Return only recent 20 events
-      job.events = job.events.slice(0, 20)
+    // Get scraped ads
+    const { data: scrapedAds } = await supabase
+      .from('scraped_ads')
+      .select('*')
+      .eq('job_id', jobId)
+      .order('position', { ascending: true })
+
+    // Get assets
+    const { data: assets } = await supabase
+      .from('assets')
+      .select('*')
+      .eq('job_id', jobId)
+      .order('created_at', { ascending: true })
+
+    // Get recent events
+    const { data: recentEvents } = await supabase
+      .from('events')
+      .select('*')
+      .eq('job_id', jobId)
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    const response: JobStatusResponse = {
+      ...job,
+      scraped_ads: scrapedAds || [],
+      assets: assets || [],
+      recent_events: recentEvents || []
     }
 
-    return c.json(job as JobStatusResponse)
-
+    return c.json(response)
   } catch (error: any) {
-    console.error('Get job endpoint error:', error)
-    return c.json({ error: error.message || 'Internal server error' }, 500)
+    console.error('Error fetching job:', error)
+    return c.json({ error: 'Internal server error: ' + error.message }, 500)
   }
 })
 
 /**
- * GET /api/jobs/:id/assets - Get all assets for a job
+ * GET /api/jobs/:id/assets
+ * Get all assets for a job
  */
 jobs.get('/:id/assets', async (c) => {
   try {
@@ -153,72 +164,61 @@ jobs.get('/:id/assets', async (c) => {
       .order('created_at', { ascending: true })
 
     if (error) {
-      return c.json({ error: error.message }, 500)
+      return c.json({ error: 'Failed to fetch assets' }, 500)
     }
 
-    return c.json({ items: assets || [] })
-
+    return c.json({ assets: assets || [] })
   } catch (error: any) {
-    console.error('Get assets endpoint error:', error)
-    return c.json({ error: error.message || 'Internal server error' }, 500)
+    console.error('Error fetching assets:', error)
+    return c.json({ error: 'Internal server error: ' + error.message }, 500)
   }
 })
 
 /**
- * PATCH /api/jobs/:id/assets/:assetId - Update asset (e.g., favorite)
+ * POST /api/jobs/:id/retry
+ * Retry failed job
  */
-jobs.patch('/:id/assets/:assetId', async (c) => {
+jobs.post('/:id/retry', async (c) => {
   try {
     const jobId = c.req.param('id')
-    const assetId = c.req.param('assetId')
-    const body = await c.req.json<{ favorited?: boolean }>()
-
     const env = c.env
     const supabase = getSupabaseAdminClient(env)
 
-    const { data: asset, error } = await supabase
-      .from('assets')
-      .update({ favorited: body.favorited })
-      .eq('id', assetId)
-      .eq('job_id', jobId)
-      .select()
+    // Check if job exists and is failed
+    const { data: job, error: jobError } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('id', jobId)
       .single()
 
-    if (error) {
-      return c.json({ error: error.message }, 500)
+    if (jobError || !job) {
+      return c.json({ error: 'Job not found' }, 404)
     }
 
-    return c.json(asset)
+    if (job.status !== 'failed') {
+      return c.json({ error: 'Job is not in failed state' }, 400)
+    }
 
-  } catch (error: any) {
-    console.error('Update asset endpoint error:', error)
-    return c.json({ error: error.message || 'Internal server error' }, 500)
-  }
-})
-
-/**
- * GET /api/jobs - List all jobs (optional, for future)
- */
-jobs.get('/', async (c) => {
-  try {
-    const env = c.env
-    const supabase = getSupabaseAdminClient(env)
-
-    const { data: jobs, error } = await supabase
+    // Reset job status
+    await supabase
       .from('jobs')
-      .select('id, source_url, brand_name, status, total_ads, successful_ads, failed_ads, created_at, updated_at')
-      .order('created_at', { ascending: false })
-      .limit(50)
+      .update({ 
+        status: 'queued',
+        error: null
+      })
+      .eq('id', jobId)
 
-    if (error) {
-      return c.json({ error: error.message }, 500)
-    }
+    // Restart processing
+    c.executionCtx.waitUntil(
+      processJob(env, job.id).catch(error => {
+        console.error('Job retry error:', error)
+      })
+    )
 
-    return c.json({ items: jobs || [] })
-
+    return c.json({ message: 'Job retry started' })
   } catch (error: any) {
-    console.error('List jobs endpoint error:', error)
-    return c.json({ error: error.message || 'Internal server error' }, 500)
+    console.error('Error retrying job:', error)
+    return c.json({ error: 'Internal server error: ' + error.message }, 500)
   }
 })
 
