@@ -1,124 +1,110 @@
-# Facebook Ad Thief - Quick Start ⚡
+# Facebook Ad Thief - Quick Start (5 Minutes)
 
-## 🎯 Your App is Live!
+The fastest way to get started with Facebook Ad Thief.
 
-**Sandbox URL:** https://3000-irgxrvheitlo7ix59mqah-3844e1b6.sandbox.novita.ai
+## 🚀 What You'll Build
 
----
+An AI-powered app that:
+1. Scrapes competitor Facebook ads
+2. Recreates them with YOUR branding using Google Gemini
+3. Stores results in Supabase
 
-## ⚠️ Before You Start
+## ⚡ Super Fast Setup
 
-You need API keys from these services (all have free tiers):
+### 1. Get API Keys (5 minutes)
 
-1. **Supabase** (database + storage) - https://supabase.com
-2. **Apify** (web scraping) - https://apify.com  
-3. **Google AI Studio** (Gemini API) - https://aistudio.google.com
+**Supabase** (https://supabase.com):
+- Create project → Get URL + anon key + service role key
+- Run `supabase-schema.sql` in SQL Editor
+- Create bucket: `ad-thief-images` (public)
 
----
+**Apify** (https://console.apify.com):
+- Sign up → Copy API token
 
-## 🚀 Setup in 5 Minutes
+**Google Gemini** (https://ai.google.dev):
+- Get API key from Google AI Studio
 
-### Step 1: Create Supabase Project
+### 2. Configure App
+
+Edit `/home/user/webapp/.dev.vars`:
 ```bash
-1. Go to supabase.com → New Project
-2. SQL Editor → Run supabase-schema.sql
-3. Storage → Create bucket: ad-thief-images (PUBLIC)
-4. Settings → API → Copy URL + keys
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+APIFY_TOKEN=apify_api_...
+GOOGLE_API_KEY=AIzaSy...
 ```
 
-### Step 2: Get API Keys
-```bash
-- Apify: Settings → Integrations → Copy token
-- Google: aistudio.google.com → Get API Key
-```
+### 3. Start Server
 
-### Step 3: Configure Environment
-Create `/home/user/webapp/.dev.vars`:
-```bash
-SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-SUPABASE_ANON_KEY=your_key
-SUPABASE_SERVICE_ROLE_KEY=your_key
-APIFY_TOKEN=your_token
-GOOGLE_API_KEY=your_key
-```
-
-### Step 4: Restart Service
 ```bash
 cd /home/user/webapp
-pm2 restart webapp
+npm run build
+fuser -k 3000/tcp 2>/dev/null || true
+pm2 start ecosystem.config.cjs
 ```
 
----
+### 4. Test It!
 
-## 🧪 Test It!
+Visit: **https://3000-irgxrvheitlo7ix59mqah-3844e1b6.sandbox.novita.ai**
 
-### Get a Test URL
-1. Go to https://www.facebook.com/ads/library
-2. Search "Athletic Greens"
-3. Click their profile
-4. Copy URL from address bar
-
-### Create Your First Job
-1. Open: https://3000-irgxrvheitlo7ix59mqah-3844e1b6.sandbox.novita.ai
-2. Click "Create Your First Job"
-3. Paste Facebook URL
-4. Upload product image
-5. Enter brand name
-6. Click "Generate Inspired Creatives"
-7. Wait 3-5 minutes
-8. Download your AI-generated ads!
-
----
-
-## 📂 Key Files
-
+Test URL:
 ```
-webapp/
-├── .dev.vars              ← CREATE THIS (your API keys)
-├── supabase-schema.sql    ← Run in Supabase SQL Editor
-├── SETUP_GUIDE.md         ← Detailed setup instructions
-└── README.md              ← Full documentation
+https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&q=athletic%20greens&search_type=keyword_unordered
 ```
 
----
+## 🎯 How It Works
 
-## 🐛 Quick Fixes
+```
+User → Paste competitor ad URL + Upload product image
+  ↓
+Apify scrapes Facebook Ad Library (30s)
+  ↓
+For each ad (parallel):
+  1. Gemini Pro analyzes → creates editing prompt
+  2. Gemini Flash generates → new branded image
+  ↓
+Results in Supabase Storage → Download gallery
+```
 
-**Service not responding?**
+## 📊 What You'll See
+
+**Status Progression:**
+```
+Queued → Scraping → Generating → Done
+(0%)     (10%)      (50-90%)    (100%)
+```
+
+**Typical Timeline:**
+- 5 ads: ~1 minute
+- 10 ads: ~2 minutes
+- 20 ads: ~3-5 minutes
+
+## 🔧 If Something Breaks
+
 ```bash
-pm2 restart webapp
+# Check logs
 pm2 logs webapp --nostream
+
+# Restart server
+pm2 restart webapp
+
+# Check database
+psql $SUPABASE_URL -c "SELECT * FROM events ORDER BY created_at DESC LIMIT 10;"
 ```
 
-**Job fails?**
-- Check `.dev.vars` has all API keys
-- Verify Supabase schema was run
-- Check storage bucket exists and is public
+## 💰 Cost (20 ads)
 
-**Can't access app?**
-- URL: https://3000-irgxrvheitlo7ix59mqah-3844e1b6.sandbox.novita.ai
-- Health check: /api/health
+- Apify: $0.015
+- Gemini: Free
+- Supabase: Free
+- Cloudflare: Free
+- **Total**: ~$0.02 ✨
 
----
+## 🎉 That's It!
 
-## 💰 Costs
-
-- **Supabase:** FREE (up to 500MB storage)
-- **Apify:** ~$0.75 per 1000 ads
-- **Google Gemini:** FREE (1500 requests/day)
-
-**Total for testing:** ~$0.00 - $2.00
+You now have a working AI ad cloner. See `SETUP_GUIDE.md` for detailed configuration.
 
 ---
 
-## 🎓 Learn More
-
-- Full docs: `README.md`
-- Detailed setup: `SETUP_GUIDE.md`
-- API docs: See README.md section
-
----
-
-**Ready? Let's generate some ads!** 🚀
-
-Visit: https://3000-irgxrvheitlo7ix59mqah-3844e1b6.sandbox.novita.ai
+**Current Status**: ✅ App running at https://3000-irgxrvheitlo7ix59mqah-3844e1b6.sandbox.novita.ai

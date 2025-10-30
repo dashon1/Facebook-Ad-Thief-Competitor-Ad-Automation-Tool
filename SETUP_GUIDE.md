@@ -1,323 +1,287 @@
-# Facebook Ad Thief - Complete Setup Guide 🚀
+# Facebook Ad Thief - Complete Setup Guide
 
-## ✅ What's Been Built
+This guide will walk you through setting up the Facebook Ad Thief application from scratch.
 
-Your **Facebook Ad Thief** application is now **fully functional** and ready to use! Here's what you have:
+## 📋 Prerequisites Checklist
 
-### Core Features Implemented
-- ✅ Beautiful landing page with gradient hero section
-- ✅ Job creation form with file upload
-- ✅ Facebook Ad Library scraping via Apify
-- ✅ AI-powered meta-prompting with Gemini 2.5 Flash
-- ✅ Image generation with Gemini 2.5 Flash
-- ✅ Async job processing with status tracking
-- ✅ Real-time progress updates (3-second polling)
-- ✅ Image gallery with download functionality
-- ✅ Prohibited content detection and skip logic
-- ✅ Comprehensive error handling and logging
-- ✅ Supabase integration for database and storage
+Before you begin, make sure you have accounts for:
 
-### Tech Stack
-- **Frontend:** Hono JSX + Tailwind CSS + Vanilla JS
-- **Backend:** Hono (Cloudflare Workers compatible)
-- **Database:** Supabase PostgreSQL
-- **Storage:** Supabase Storage
-- **AI:** Google Gemini 2.5 Flash (Meta-prompting + Image Gen)
-- **Scraping:** Apify (Facebook Ad Library Actor)
-- **Runtime:** Cloudflare Pages / Workers
+- [ ] **Supabase** - https://supabase.com (Free tier available)
+- [ ] **Apify** - https://apify.com (Free $5 credit on signup)
+- [ ] **Google Cloud** - https://ai.google.dev (Free tier: 60 req/min)
+- [ ] **Cloudflare** - https://cloudflare.com (Free tier includes Workers)
 
----
+## Step 1: Supabase Setup (15 minutes)
 
-## 🌐 Access Your Application
+### 1.1 Create Supabase Project
 
-### Sandbox Development URL
-**Your app is running at:**
-```
-https://3000-irgxrvheitlo7ix59mqah-3844e1b6.sandbox.novita.ai
-```
-
-**API Health Check:**
-```
-https://3000-irgxrvheitlo7ix59mqah-3844e1b6.sandbox.novita.ai/api/health
-```
-
-**Try it now!** Click the URL above and you'll see the beautiful landing page.
-
----
-
-## ⚙️ Required Configuration
-
-Before you can create jobs, you need to set up these services:
-
-### 1. Supabase Setup (Database + Storage)
-
-**Step 1: Create Supabase Project**
-1. Go to https://supabase.com
+1. Go to https://supabase.com/dashboard
 2. Click "New Project"
-3. Choose organization and set project name
-4. Wait for project to be created
+3. Choose organization and fill in:
+   - **Name**: `facebook-ad-thief`
+   - **Database Password**: Generate a strong password (save it!)
+   - **Region**: Choose closest to your users
+4. Click "Create new project" and wait ~2 minutes
 
-**Step 2: Run Database Schema**
-1. In Supabase dashboard, go to SQL Editor
-2. Click "New Query"
-3. Copy contents from `/home/user/webapp/supabase-schema.sql`
-4. Paste and click "Run"
-5. You should see: "Success. No rows returned"
+### 1.2 Create Database Schema
 
-**Step 3: Create Storage Bucket**
-1. In Supabase dashboard, go to Storage
-2. Click "New Bucket"
-3. Name: `ad-thief-images`
-4. Public bucket: **YES** (toggle on)
-5. Click "Create Bucket"
+1. In your project, go to **SQL Editor**
+2. Open the file `/home/user/webapp/supabase-schema.sql`
+3. Copy ALL the contents
+4. Paste into Supabase SQL Editor
+5. Click "Run" button
+6. You should see: "Success. No rows returned"
 
-**Step 4: Get Credentials**
-1. Go to Settings → API
-2. Copy your project URL
-3. Copy your `anon` (public) key
-4. Copy your `service_role` key (under "Project API keys")
+### 1.3 Create Storage Bucket
 
-### 2. Apify Setup (Facebook Ad Scraping)
+1. Go to **Storage** in left sidebar
+2. Click "Create a new bucket"
+3. Configure:
+   - **Name**: `ad-thief-images`
+   - **Public bucket**: ✅ ON
+   - **File size limit**: 10485760 (10MB)
+4. Click "Create bucket"
 
-**Step 1: Create Account**
-1. Go to https://apify.com
-2. Sign up for free account
+### 1.4 Get API Credentials
 
-**Step 2: Get API Token**
-1. Go to Settings → Integrations → API
-2. Copy your API token
+1. Go to **Settings** → **API**
+2. Copy these values (you'll need them soon):
+   ```
+   Project URL: https://xxxxxxxxxxxxx.supabase.co
+   anon public key: eyJhbGc...
+   service_role key: eyJhbGc... (⚠️ Keep this secret!)
+   ```
 
-**Cost:** ~$0.75 per 1000 ads scraped (very affordable!)
+## Step 2: Apify Setup (5 minutes)
 
-### 3. Google AI Studio (Gemini API)
+### 2.1 Create Account
 
-**Step 1: Create Account**
-1. Go to https://aistudio.google.com
-2. Sign in with Google account
+1. Go to https://console.apify.com/sign-up
+2. Sign up (you get $5 free credit)
+3. Verify your email
 
-**Step 2: Get API Key**
-1. Click "Get API Key"
-2. Create new API key
-3. Copy the key
+### 2.2 Get API Token
 
-**Cost:** FREE for first 1500 requests/day!
+1. Go to https://console.apify.com/account/integrations
+2. Under "API tokens", copy your **Personal API token**
+3. Save it (you'll use this as `APIFY_TOKEN`)
 
----
+### 2.3 Test the Actor (Optional)
 
-## 🔧 Configure Environment Variables
+1. Go to https://apify.com/curious_coder/facebook-ads-library-scraper
+2. Click "Try for free"
+3. Test with: `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&q=athletic%20greens`
+4. Should scrape ~20 ads successfully
 
-Create a file called `.dev.vars` in `/home/user/webapp/` with:
+## Step 3: Google Gemini API Setup (5 minutes)
+
+### 3.1 Get API Key
+
+1. Go to https://ai.google.dev/
+2. Click "Get API key in Google AI Studio"
+3. Sign in with Google account
+4. Click "Create API key"
+5. Select or create a Google Cloud project
+6. Copy the API key (looks like: `AIzaSyB...`)
+
+### 3.2 Verify Access
+
+You can test in browser console:
+```bash
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=YOUR_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"contents":[{"parts":[{"text":"Hello"}]}]}'
+```
+
+## Step 4: Configure Local Environment
+
+### 4.1 Update .dev.vars File
+
+1. Open `/home/user/webapp/.dev.vars`
+2. Replace placeholders with your actual credentials:
 
 ```bash
 # Supabase Configuration
-SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-SUPABASE_ANON_KEY=your_anon_key_here
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+SUPABASE_URL=https://xxxxxxxxxxxxx.supabase.co
+SUPABASE_ANON_KEY=eyJhbGc...your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...your_service_role_key
 
 # Apify Configuration
-APIFY_TOKEN=your_apify_token_here
+APIFY_TOKEN=apify_api_xxx...your_token
 
-# Google Gemini API
-GOOGLE_API_KEY=your_google_api_key_here
+# Google Gemini API Configuration
+GOOGLE_API_KEY=AIzaSyB...your_api_key
 
-# Optional: App Configuration (defaults shown)
+# App Configuration
 MAX_ADS_PER_JOB=20
 DEFAULT_BATCH_SIZE=5
 ```
 
-**Then restart the service:**
+### 4.2 Rebuild and Restart
+
 ```bash
 cd /home/user/webapp
+npm run build
+fuser -k 3000/tcp 2>/dev/null || true
 pm2 restart webapp
 ```
 
----
+## Step 5: Test the Application
 
-## 🧪 Testing the Application
+### 5.1 Access the App
 
-### Test Flow
+1. Visit: https://3000-irgxrvheitlo7ix59mqah-3844e1b6.sandbox.novita.ai
+2. You should see the landing page with "Facebook Ad Thief"
 
-1. **Open the landing page:**
-   - Go to: https://3000-irgxrvheitlo7ix59mqah-3844e1b6.sandbox.novita.ai
-   - You should see the hero section and "Create Your First Job" button
+### 5.2 Test Job Creation
 
-2. **Click "Create Your First Job"**
-   - This takes you to `/new` with the job creation form
+1. Click "Start Creating Ads"
+2. Enter this test URL:
+   ```
+   https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&q=athletic%20greens&search_type=keyword_unordered
+   ```
+3. Enter brand name: `Test Brand`
+4. Upload any product image (PNG/JPG)
+5. Click "Generate Inspired Creatives"
 
-3. **Fill in the form:**
-   - **Facebook Ad Library URL:** Get this by:
-     - Go to https://www.facebook.com/ads/library
-     - Search for "Athletic Greens" (or any competitor)
-     - Click on their profile
-     - Copy the URL from browser address bar
-   - **Brand Name:** Enter "Thrive Mix" (or your brand)
-   - **Product Image:** Upload a product photo (PNG/JPG, max 10MB)
-   - **Max Ads:** Keep default 20
-   - **Batch Size:** Keep default 5
+### 5.3 Monitor Progress
 
-4. **Click "Generate Inspired Creatives"**
-   - You'll be redirected to `/jobs/{jobId}`
-   - Status will show "queued" → "scraping" → "generating" → "done"
-   - Progress bar updates every 3 seconds
-   - After 2-5 minutes, you'll see generated images!
+1. You'll be redirected to `/jobs/{job-id}`
+2. Watch the status change:
+   - Queued → Scraping → Generating → Done
+3. Check Supabase tables to verify data:
+   ```sql
+   SELECT * FROM jobs ORDER BY created_at DESC LIMIT 1;
+   SELECT * FROM events WHERE job_id = 'YOUR_JOB_ID';
+   ```
 
-5. **View & Download Images:**
-   - Scroll down to see gallery of generated ads
-   - Hover over image → click "Download"
-   - Mark favorites with star icon
+### 5.4 Troubleshooting
 
----
+**If job gets stuck:**
+```sql
+-- Check events table for errors
+SELECT * FROM events WHERE job_id = 'YOUR_JOB_ID' ORDER BY created_at DESC;
 
-## 📊 How It Works (Under the Hood)
-
-```
-User submits form
-    ↓
-Job created in Supabase (status: queued)
-    ↓
-Async processing starts
-    ↓
-1. Apify scrapes Facebook Ad Library (30-60s)
-    ↓
-2. For each competitor ad:
-   a. Download ad image
-   b. Generate meta-prompt (Gemini 2.5 Flash) 
-      → Analyzes layout, suggests edits
-   c. Generate new image (Gemini 2.5 Flash)
-      → Creates ad with your branding
-   d. Upload to Supabase Storage
-   e. Save record to database
-    ↓
-Job status updates: done
-    ↓
-User sees gallery of generated ads
+-- Check job error field
+SELECT status, error FROM jobs WHERE id = 'YOUR_JOB_ID';
 ```
 
-**Timeline:** ~3-5 minutes for 20 ads
+**Common issues:**
+- ❌ "Missing SUPABASE_URL" → Check .dev.vars has correct values
+- ❌ Job stays "queued" → Check PM2 logs: `pm2 logs webapp --nostream`
+- ❌ Apify timeout → Increase timeout in `src/lib/apify.ts` line 53
+- ❌ Gemini "prohibited" → Normal, ~10-20% of ads get flagged
 
----
+## Step 6: Production Deployment (Optional)
 
-## 🚀 Deploy to Production (Cloudflare Pages)
-
-When you're ready to deploy:
+### 6.1 Install Wrangler CLI
 
 ```bash
-# 1. Build the project
+npm install -g wrangler
+wrangler login
+```
+
+### 6.2 Set Production Secrets
+
+```bash
+cd /home/user/webapp
+
+# You'll be prompted to enter each value
+wrangler pages secret put SUPABASE_URL
+wrangler pages secret put SUPABASE_ANON_KEY
+wrangler pages secret put SUPABASE_SERVICE_ROLE_KEY
+wrangler pages secret put APIFY_TOKEN
+wrangler pages secret put GOOGLE_API_KEY
+```
+
+### 6.3 Deploy
+
+```bash
 npm run build
-
-# 2. Deploy to Cloudflare
 npx wrangler pages deploy dist --project-name facebook-ad-thief
-
-# 3. Set environment variables (secrets)
-npx wrangler pages secret put SUPABASE_URL --project-name facebook-ad-thief
-npx wrangler pages secret put SUPABASE_ANON_KEY --project-name facebook-ad-thief
-npx wrangler pages secret put SUPABASE_SERVICE_ROLE_KEY --project-name facebook-ad-thief
-npx wrangler pages secret put APIFY_TOKEN --project-name facebook-ad-thief
-npx wrangler pages secret put GOOGLE_API_KEY --project-name facebook-ad-thief
 ```
 
 Your app will be live at: `https://facebook-ad-thief.pages.dev`
 
----
+## 🎯 Usage Tips
 
-## 🐛 Troubleshooting
+### Best Practices
 
-### "Job not found" error
-- Make sure Supabase credentials are correct in `.dev.vars`
-- Check PM2 logs: `pm2 logs webapp`
+1. **Start Small**: Test with `maxAds: 5` before running full batches
+2. **Monitor Costs**: 
+   - Apify: ~$0.75 per 1000 ads
+   - Gemini: Free tier is generous (60 req/min)
+3. **Quality Product Images**: Use high-res, clear product shots for best results
+4. **Brand Name**: Use exact capitalization (e.g., "ThriveMax" not "thrivemax")
 
-### Images not generating
-- Verify Google AI Studio API key is valid
-- Check if you hit free tier limits (1500 requests/day)
-- Some images may be flagged as "prohibited" (this is normal)
+### Cost Estimation
 
-### Scraping fails
-- Verify Apify token is correct
-- Make sure Facebook Ad Library URL is valid
-- Check if competitor has active ads
+For processing 20 competitor ads:
+- **Apify**: $0.015 (20 ads × $0.00075)
+- **Gemini**: $0.00 (free tier)
+- **Supabase**: $0.00 (free tier)
+- **Cloudflare**: $0.00 (free tier)
+- **Total**: ~$0.02 per job ✨
 
-### Service not starting
-```bash
-pm2 delete all
-cd /home/user/webapp
-npm run build
-pm2 start ecosystem.config.cjs
-pm2 logs webapp
-```
+### Performance Tuning
 
----
+**Batch Size Impact:**
+| Batch Size | Time | Reliability | Recommended For |
+|------------|------|-------------|-----------------|
+| 1 | ~10 min | ⭐⭐⭐⭐⭐ | First test run |
+| 3 | ~5 min | ⭐⭐⭐⭐ | Conservative |
+| 5 | ~3 min | ⭐⭐⭐ | **Default** |
+| 10 | ~2 min | ⭐⭐ | Speed priority |
 
-## 📁 Project Structure
+## 🔍 Debugging Checklist
 
-```
-webapp/
-├── src/
-│   ├── index.tsx           # Main app + routes
-│   ├── types/              # TypeScript definitions
-│   ├── lib/
-│   │   ├── apify.ts        # Facebook scraping
-│   │   ├── gemini.ts       # AI meta-prompt + image gen
-│   │   ├── storage.ts      # Supabase storage
-│   │   ├── processor.ts    # Job processing engine
-│   │   ├── logger.ts       # Event logging
-│   │   └── supabase.ts     # Database client
-│   └── routes/
-│       └── jobs.ts         # API endpoints
-├── public/static/
-│   ├── job-form.js         # Form handling
-│   └── job-status.js       # Status page polling
-├── dist/                   # Built files
-├── .dev.vars              # Environment variables (create this!)
-├── ecosystem.config.cjs    # PM2 configuration
-├── supabase-schema.sql    # Database schema
-└── README.md              # Main documentation
-```
+If things aren't working:
 
----
+- [ ] Check PM2 status: `pm2 status`
+- [ ] Check PM2 logs: `pm2 logs webapp --nostream`
+- [ ] Verify env vars loaded: Look for "Using vars defined in .dev.vars" in logs
+- [ ] Test Supabase connection:
+  ```bash
+  curl "https://YOUR_PROJECT.supabase.co/rest/v1/jobs" \
+    -H "apikey: YOUR_ANON_KEY"
+  ```
+- [ ] Test Apify token:
+  ```bash
+  curl "https://api.apify.com/v2/acts?token=YOUR_TOKEN"
+  ```
+- [ ] Test Gemini API:
+  ```bash
+  curl "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_KEY"
+  ```
 
-## 🎯 What's Next?
+## 📚 Additional Resources
 
-### Immediate Next Steps
-1. Set up Supabase account and run schema
-2. Get Apify and Google API keys
-3. Create `.dev.vars` file with credentials
-4. Restart service: `pm2 restart webapp`
-5. Test with a real job!
+- **Supabase Docs**: https://supabase.com/docs
+- **Apify Docs**: https://docs.apify.com/
+- **Gemini API Docs**: https://ai.google.dev/docs
+- **Hono Docs**: https://hono.dev/
+- **Cloudflare Pages**: https://developers.cloudflare.com/pages/
 
-### Future Enhancements
-- [ ] Add user authentication (Supabase Auth)
-- [ ] Implement ZIP download for all images
-- [ ] Add Cloudflare Queues for better scaling
-- [ ] Support video ads
-- [ ] Add copy/text rewriting
-- [ ] Team workspaces
-- [ ] A/B testing bundles
+## 🆘 Getting Help
 
----
+If you're stuck:
 
-## 💡 Tips for Best Results
+1. Check the logs first: `pm2 logs webapp --nostream`
+2. Check Supabase events table: `SELECT * FROM events ORDER BY created_at DESC LIMIT 50;`
+3. Verify all API keys are valid
+4. Try with a single ad first: `maxAds: 1`
 
-1. **Choose competitors with strong creative** - The better their ads, the better your results
-2. **Use high-quality product images** - Clear, well-lit photos work best
-3. **Start with 5-10 ads** - Test the system before processing 20
-4. **Some images will fail** - This is normal (safety filters, technical issues)
-5. **Review before publishing** - Always check generated ads for quality
+## ✅ Success Criteria
+
+You've successfully set up the app when:
+
+- ✅ Landing page loads at localhost:3000
+- ✅ Job creation form accepts input
+- ✅ Job progresses through: queued → scraping → generating → done
+- ✅ Generated images appear in gallery
+- ✅ Images stored in Supabase Storage
+- ✅ Can download individual images
 
 ---
 
-## 📞 Need Help?
-
-- Check logs: `pm2 logs webapp --nostream`
-- Review API health: `curl http://localhost:3000/api/health`
-- Read full docs: `README.md`
-- Check Supabase dashboard for job records
-
----
-
-**You're all set! 🎉**
-
-Your Facebook Ad Thief is ready to transform competitor ads into your own branded creatives. Just set up the environment variables and start generating!
-
-**Sandbox URL:** https://3000-irgxrvheitlo7ix59mqah-3844e1b6.sandbox.novita.ai
-
-Happy ad stealing! 🎭✨
+**Congratulations! 🎉 Your Facebook Ad Thief is ready to clone competitor ads!**
