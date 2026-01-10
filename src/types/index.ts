@@ -77,14 +77,45 @@ export interface JobStatusResponse extends Job {
   recent_events?: Event[]
 }
 
-// Apify Types
+// Apify Types - Official apify/facebook-ads-scraper format
 export interface ApifyScrapedAd {
-  original_image_url: string
+  // Direct image URLs (older format or backup)
+  original_image_url?: string
   resized_image_url?: string
+  
+  // Official scraper format
+  snapshot?: {
+    images?: Array<{
+      originalImageUrl?: string
+      resizedImageUrl?: string
+      imageUrl?: string
+    }>
+    videos?: Array<{
+      videoHdUrl?: string
+      videoSdUrl?: string
+      videoPreviewImageUrl?: string
+    }>
+    body?: {
+      text?: string
+    }
+    title?: string
+    linkDescription?: string
+    linkUrl?: string
+  }
+  
+  // Ad metadata
   ad_creative_bodies?: string[]
   ad_creative_link_captions?: string[]
   ad_creative_link_descriptions?: string[]
   ad_creative_link_titles?: string[]
+  
+  // Page info
+  pageName?: string
+  pageId?: string
+  adArchiveId?: string
+  startDate?: number
+  endDate?: number
+  isActive?: boolean
 }
 
 // Gemini API Types

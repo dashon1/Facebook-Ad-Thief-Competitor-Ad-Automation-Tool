@@ -1,7 +1,8 @@
 import type { Env, ApifyScrapedAd } from '../types'
 
 const APIFY_API_URL = 'https://api.apify.com/v2'
-const FACEBOOK_AD_LIBRARY_ACTOR = 'curious_coder/facebook-ads-library-scraper'
+// Official Apify Facebook Ads Scraper - most reliable and actively maintained
+const FACEBOOK_AD_LIBRARY_ACTOR = 'apify/facebook-ads-scraper'
 
 export interface ApifyRunResponse {
   data: {
@@ -32,10 +33,10 @@ export async function scrapeFacebookAdLibrary(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        urls: [sourceUrl],
-        limitPerSource: maxAds,
-        scrapeAdDetails: false,
-        countryCode: 'ALL'
+        // Input format for apify/facebook-ads-scraper
+        startUrls: [{ url: sourceUrl }],
+        maxItems: maxAds,
+        scrapeAdDetails: true  // Get full ad details including images
       })
     }
   )
@@ -94,7 +95,15 @@ export async function scrapeFacebookAdLibrary(
   console.log(`Successfully scraped ${items.length} ads from Facebook Ad Library`)
 
   // Filter out items without images
-  const validItems = items.filter(item => item.original_image_url || item.resized_image_url)
+  // The official scraper returns data with different structure
+  const validItems = items.filter(item => {
+    // Check for images in snapshot object (official scraper format)
+    const hasImages = item.snapshot?.images?.length > 0
+    const hasOriginalImage = item.original_image_url || item.resized_image_url
+    return hasImages || hasOriginalImage
+  })
+
+  console.log(`Filtered ${validItems.length} ads with images from ${items.length} total ads`)
 
   return validItems
 }

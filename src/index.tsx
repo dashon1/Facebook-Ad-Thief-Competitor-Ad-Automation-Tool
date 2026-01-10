@@ -353,6 +353,14 @@ app.get('/new', (c) => {
             const submitBtn = document.getElementById('submitBtn');
             const statusMessage = document.getElementById('statusMessage');
 
+            // Validate file is selected
+            if (!selectedFile) {
+              statusMessage.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded';
+              statusMessage.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>Please select a product image';
+              statusMessage.classList.remove('hidden');
+              return;
+            }
+
             // Disable form
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating Job...';
@@ -373,6 +381,12 @@ app.get('/new', (c) => {
                 productImage: productImageBase64,
                 maxAds: parseInt(document.getElementById('maxAds').value),
                 batchSize: parseInt(document.getElementById('batchSize').value)
+              }, {
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity
               });
 
               // Redirect to job status page
@@ -380,9 +394,10 @@ app.get('/new', (c) => {
 
             } catch (error) {
               console.error('Error:', error);
+              console.error('Error details:', error.response?.data);
+              const errorMsg = error.response?.data?.error || error.message || 'Failed to create job. Please try again.';
               statusMessage.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded';
-              statusMessage.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>' + 
-                (error.response?.data?.error || 'Failed to create job. Please try again.');
+              statusMessage.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>' + errorMsg;
               statusMessage.classList.remove('hidden');
 
               submitBtn.disabled = false;

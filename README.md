@@ -4,6 +4,14 @@
 
 A full-stack web application built with Hono, Cloudflare Pages, Supabase, Apify, and Google Gemini 2.5 that automates the process of finding, analyzing, and recreating competitor Facebook ads with your own branding.
 
+## 🚀 Live Application
+
+**Production URL**: https://ad-thief.pages.dev
+
+**API Health Check**: https://ad-thief.pages.dev/api/health
+
+**Powered by**: AI Microtechlink | Microtechlink Inc.
+
 ## 🌟 Features
 
 ### Currently Implemented
@@ -34,7 +42,7 @@ A full-stack web application built with Hono, Cloudflare Pages, Supabase, Apify,
 - **Backend**: Hono (Cloudflare Workers framework)
 - **Database**: Supabase Postgres
 - **Storage**: Supabase Storage
-- **Scraping**: Apify Facebook Ad Library Actor
+- **Scraping**: Apify Official Facebook Ads Scraper (`apify/facebook-ads-scraper`)
 - **AI**: Google Gemini 2.5 Flash (meta-prompting + image generation)
 - **Deployment**: Cloudflare Pages
 

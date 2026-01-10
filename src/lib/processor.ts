@@ -45,16 +45,31 @@ export async function processJob(env: Env, jobId: string): Promise<void> {
       .eq('id', jobId)
 
     // Step 2: Save scraped ads to database
-    const scrapedAdRecords = scrapedAds.map((ad, index) => ({
-      job_id: jobId,
-      source_image_url: ad.original_image_url || ad.resized_image_url || '',
-      position: index,
-      meta: {
-        ad_creative_bodies: ad.ad_creative_bodies || [],
-        ad_creative_link_titles: ad.ad_creative_link_titles || []
-      },
-      status: 'pending' as const
-    }))
+    const scrapedAdRecords = scrapedAds.map((ad, index) => {
+      // Extract image URL from official scraper format or fallback
+      let imageUrl = ad.original_image_url || ad.resized_image_url || ''
+      
+      // Try snapshot format first (official apify/facebook-ads-scraper)
+      if (ad.snapshot?.images?.length > 0) {
+        const firstImage = ad.snapshot.images[0]
+        imageUrl = firstImage.originalImageUrl || firstImage.resizedImageUrl || firstImage.imageUrl || imageUrl
+      }
+      
+      return {
+        job_id: jobId,
+        source_image_url: imageUrl,
+        position: index,
+        meta: {
+          ad_creative_bodies: ad.ad_creative_bodies || [],
+          ad_creative_link_titles: ad.ad_creative_link_titles || [],
+          body_text: ad.snapshot?.body?.text || '',
+          title: ad.snapshot?.title || '',
+          page_name: ad.pageName || '',
+          ad_archive_id: ad.adArchiveId || ''
+        },
+        status: 'pending' as const
+      }
+    })
 
     const { data: insertedAds, error: insertError } = await supabase
       .from('scraped_ads')

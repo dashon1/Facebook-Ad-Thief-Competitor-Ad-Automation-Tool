@@ -68,10 +68,16 @@ Before you begin, make sure you have accounts for:
 
 ### 2.3 Test the Actor (Optional)
 
-1. Go to https://apify.com/curious_coder/facebook-ads-library-scraper
+1. Go to https://apify.com/apify/facebook-ads-scraper (Official Apify Scraper)
 2. Click "Try for free"
-3. Test with: `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&q=athletic%20greens`
+3. Test with any of these URLs:
+   - By keyword: `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&q=nike`
+   - By page: `https://www.facebook.com/ComplexSneakers/`
 4. Should scrape ~20 ads successfully
+
+**Pricing**: 
+- Free tier: $5.80 per 1,000 ads
+- Paid plans: Starting at $5.00 per 1,000 ads (Starter plan)
 
 ## Step 3: Google Gemini API Setup (5 minutes)
 
