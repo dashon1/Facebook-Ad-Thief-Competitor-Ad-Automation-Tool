@@ -2,7 +2,8 @@ import type { Env, ApifyScrapedAd } from '../types'
 
 const APIFY_API_URL = 'https://api.apify.com/v2'
 // Official Apify Facebook Ads Scraper - most reliable and actively maintained
-const FACEBOOK_AD_LIBRARY_ACTOR = 'apify/facebook-ads-scraper'
+// NOTE: Apify API uses ~ (tilde) as separator, not /
+const FACEBOOK_AD_LIBRARY_ACTOR = 'apify~facebook-ads-scraper'
 
 export interface ApifyRunResponse {
   data: {
