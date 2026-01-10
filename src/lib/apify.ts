@@ -53,8 +53,9 @@ export async function scrapeFacebookAdLibrary(
 
   console.log(`Apify run started with ID: ${runId}`)
 
-  // Step 2: Poll for completion (max 2 minutes)
-  const maxAttempts = 24 // 24 * 5s = 2 minutes
+  // Step 2: Poll for completion (max 5 minutes)
+  // Facebook Ad Library scraping can take 2-5 minutes for popular searches
+  const maxAttempts = 60 // 60 * 5s = 5 minutes
   let attempts = 0
   let runStatus = 'RUNNING'
 
