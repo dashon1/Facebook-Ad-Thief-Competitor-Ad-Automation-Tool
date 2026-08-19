@@ -19,9 +19,9 @@ jobs.post('/', async (c) => {
       return c.json({ error: 'Missing required fields: sourceUrl and productImage' }, 400)
     }
 
-    // Validate Facebook Ad Library URL
-    if (!body.sourceUrl.includes('facebook.com/ads/library')) {
-      return c.json({ error: 'Invalid Facebook Ad Library URL' }, 400)
+    // Validate Facebook URL (accept both Page URLs and Ad Library URLs)
+    if (!body.sourceUrl.includes('facebook.com')) {
+      return c.json({ error: 'Invalid Facebook URL' }, 400)
     }
 
     const env = c.env
