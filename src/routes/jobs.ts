@@ -115,8 +115,13 @@ jobs.post('/:id/import-existing', async (c) => {
       return c.json({ error: 'Job not found' }, 404)
     }
 
-    if (job.status !== 'failed' && job.status !== 'queued') {
-      return c.json({ error: 'Job must be queued or failed before importing existing reference ads' }, 400)
+    const isStaleZeroOutputGeneration =
+      job.status === 'generating' &&
+      job.successful_ads === 0 &&
+      job.failed_ads > 0
+
+    if (job.status !== 'failed' && job.status !== 'queued' && !isStaleZeroOutputGeneration) {
+      return c.json({ error: 'Job must be queued, failed, or a stalled zero-output generation before importing existing reference ads' }, 400)
     }
 
     await supabase
