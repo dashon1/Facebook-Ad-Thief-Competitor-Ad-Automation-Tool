@@ -20,18 +20,18 @@ export async function generateMetaPrompt(
 
 Analyze two images:
 1. Our product photo (brand: ${brandName})
-2. A competitor's advertisement
+2. A reference advertisement
 
-Your task: Write a DETAILED image-editing prompt that will recreate the competitor ad's layout, lighting, composition, and typography while replacing ANY brand marks, logos, text, or product imagery with ${brandName}'s branding.
+Your task: Write a DETAILED image-editing prompt that draws only on high-level visual lessons from the reference, such as hierarchy, clarity, lighting, and category-appropriate composition, while creating a clearly original ${brandName} creative.
 
 CRITICAL REQUIREMENTS:
-- Detect and specify removal of ALL competitor brand elements (including partial fragments like "A", "AG", "G", "G1", etc.)
-- Preserve the exact layout, composition, color scheme, and visual style
-- Maintain the same messaging tone and copy structure, but replace brand name
-- Specify exact placement for ${brandName} product/packaging
+- Remove and exclude all reference-brand elements, logos, slogans, copy, product imagery, and distinctive trade dress
+- Create a meaningfully distinct layout, color treatment, typography, and background rather than reproducing the reference
+- Use new, truthful, brand-appropriate messaging; do not make outcome guarantees or copy the reference message structure
+- Specify an original placement for the ${brandName} product or packaging
 - Include lighting, shadow, and reflection adjustments needed
-- Keep background, typography style, and overall aesthetic identical
-- If multiple product packages appear, specify ${brandName} replacement for each
+- Ensure the final creative is recognizably an original ${brandName} design
+- If multiple product packages appear in the reference, use only the concept of a multi-product arrangement and create a distinct arrangement
 
 Output ONLY the final editing prompt - no explanations, no preamble. The prompt should be ready to send directly to an image generation model.`
 
@@ -63,7 +63,7 @@ Output ONLY the final editing prompt - no explanations, no preamble. The prompt 
   }
 
   const response = await fetch(
-    `${GEMINI_API_URL}/gemini-2.0-flash-exp:generateContent?key=${env.GOOGLE_API_KEY}`,
+    `${GEMINI_API_URL}/gemini-2.5-flash:generateContent?key=${env.GOOGLE_API_KEY}`,
     {
       method: 'POST',
       headers: {
@@ -101,7 +101,7 @@ Output ONLY the final editing prompt - no explanations, no preamble. The prompt 
 }
 
 /**
- * Generate image using Gemini 2.5 Flash Image Preview (Nano Banana)
+ * Generate image using Gemini 2.5 Flash Image (Nano Banana)
  */
 export async function generateImageWithNanoBanana(
   env: Env,
@@ -140,7 +140,7 @@ export async function generateImageWithNanoBanana(
   }
 
   const response = await fetch(
-    `${GEMINI_API_URL}/gemini-2.0-flash-exp:generateContent?key=${env.GOOGLE_API_KEY}`,
+    `${GEMINI_API_URL}/gemini-2.5-flash-image:generateContent?key=${env.GOOGLE_API_KEY}`,
     {
       method: 'POST',
       headers: {
