@@ -191,10 +191,17 @@ export async function downloadImageAsBase64(imageUrl: string): Promise<string> {
     throw new Error(`Failed to download image from ${imageUrl}: ${response.status}`)
   }
 
-  const arrayBuffer = await response.arrayBuffer()
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
-  
-  return base64
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  const chunkSize = 0x8000
+  let binary = ''
+
+  // Avoid spreading a large byte array into String.fromCharCode, which exceeds
+  // the Cloudflare Worker call-stack limit for ordinary advertising images.
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))
+  }
+
+  return btoa(binary)
 }
 
 /**
