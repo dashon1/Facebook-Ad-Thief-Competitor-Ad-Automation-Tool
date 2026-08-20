@@ -23,7 +23,8 @@ export async function uploadToStorage(
     .from(BUCKET_NAME)
     .upload(fileName, buffer, {
       contentType: mimeType,
-      upsert: false
+      // Retried jobs reuse deterministic source/generated paths; overwrite them safely.
+      upsert: true
     })
 
   if (error) {
