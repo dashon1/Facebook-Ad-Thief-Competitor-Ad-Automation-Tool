@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
-import type { Env, CreateJobRequest, CreateJobResponse, JobStatusResponse } from '../types'
+import type { Env, CreateJobRequest, CreateJobResponse, ImportExistingAdsRequest, JobStatusResponse } from '../types'
 import { getSupabaseAdminClient } from '../lib/supabase'
 import { uploadProductImage } from '../lib/storage'
-import { processJob } from '../lib/processor'
+import { processImportedAds, processJob } from '../lib/processor'
 
 const jobs = new Hono<{ Bindings: Env }>()
 
@@ -86,6 +86,78 @@ jobs.post('/', async (c) => {
     return c.json(response, 201)
   } catch (error: any) {
     console.error('Error creating job:', error)
+    return c.json({ error: 'Internal server error: ' + error.message }, 500)
+  }
+})
+
+/**
+ * POST /api/jobs/:id/import-existing
+ * Reuse completed Apify records and start generation without launching a new scrape.
+ */
+jobs.post('/:id/import-existing', async (c) => {
+  try {
+    const jobId = c.req.param('id')
+    const body = await c.req.json<ImportExistingAdsRequest>()
+
+    if (!Array.isArray(body.referenceAds) || body.referenceAds.length === 0) {
+      return c.json({ error: 'referenceAds must contain at least one existing Apify record' }, 400)
+    }
+
+    const env = c.env
+    const supabase = getSupabaseAdminClient(env)
+    const { data: job, error: jobError } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('id', jobId)
+      .single()
+
+    if (jobError || !job) {
+      return c.json({ error: 'Job not found' }, 404)
+    }
+
+    if (job.status !== 'failed' && job.status !== 'queued') {
+      return c.json({ error: 'Job must be queued or failed before importing existing reference ads' }, 400)
+    }
+
+    await supabase
+      .from('scraped_ads')
+      .delete()
+      .eq('job_id', jobId)
+
+    await supabase
+      .from('assets')
+      .delete()
+      .eq('job_id', jobId)
+
+    const { error: resetError } = await supabase
+      .from('jobs')
+      .update({
+        status: 'queued',
+        total_ads: 0,
+        processed_ads: 0,
+        successful_ads: 0,
+        failed_ads: 0,
+        error: null,
+        completed_at: null
+      })
+      .eq('id', jobId)
+
+    if (resetError) {
+      return c.json({ error: `Failed to prepare job import: ${resetError.message}` }, 500)
+    }
+
+    c.executionCtx.waitUntil(
+      processImportedAds(env, jobId, body.referenceAds).catch(error => {
+        console.error('Imported-reference job processing error:', error)
+      })
+    )
+
+    return c.json({
+      jobId,
+      message: `Imported ${body.referenceAds.length} existing reference ads; generation started without a new Apify run`
+    })
+  } catch (error: any) {
+    console.error('Error importing existing reference ads:', error)
     return c.json({ error: 'Internal server error: ' + error.message }, 500)
   }
 })

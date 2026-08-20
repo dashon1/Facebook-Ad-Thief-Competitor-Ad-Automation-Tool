@@ -71,6 +71,10 @@ export interface CreateJobResponse {
   message: string
 }
 
+export interface ImportExistingAdsRequest {
+  referenceAds: ApifyScrapedAd[]
+}
+
 export interface JobStatusResponse extends Job {
   scraped_ads?: ScrapedAd[]
   assets?: Asset[]

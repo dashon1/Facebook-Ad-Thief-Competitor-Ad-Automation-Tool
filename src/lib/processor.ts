@@ -1,4 +1,4 @@
-import type { Env, Job, ScrapedAd } from '../types'
+import type { Env, Job, ScrapedAd, ApifyScrapedAd } from '../types'
 import { getSupabaseAdminClient } from './supabase'
 import { scrapeFacebookAdLibrary } from './apify'
 import { generateMetaPrompt, generateImageWithNanoBanana, downloadImageAsBase64 } from './gemini'
@@ -32,88 +32,126 @@ export async function processJob(env: Env, jobId: string): Promise<void> {
 
     const scrapedAds = await scrapeFacebookAdLibrary(env, job.source_url, job.max_ads)
 
-    if (scrapedAds.length === 0) {
-      throw new Error('No ads found in Facebook Ad Library')
-    }
-
-    await logInfo(env, jobId, `Found ${scrapedAds.length} ads to process`)
-
-    // Update total ads count
-    await supabase
-      .from('jobs')
-      .update({ total_ads: scrapedAds.length })
-      .eq('id', jobId)
-
-    // Step 2: Save scraped ads to database
-    const scrapedAdRecords = scrapedAds.map((ad, index) => {
-      // Extract image URL from official scraper format or fallback
-      let imageUrl = ad.original_image_url || ad.resized_image_url || ''
-      
-      // Try snapshot format first (official apify/facebook-ads-scraper)
-      if (ad.snapshot?.images?.length > 0) {
-        const firstImage = ad.snapshot.images[0]
-        imageUrl = firstImage.originalImageUrl || firstImage.resizedImageUrl || firstImage.imageUrl || imageUrl
-      }
-      
-      return {
-        job_id: jobId,
-        source_image_url: imageUrl,
-        position: index,
-        meta: {
-          ad_creative_bodies: ad.ad_creative_bodies || [],
-          ad_creative_link_titles: ad.ad_creative_link_titles || [],
-          body_text: ad.snapshot?.body?.text || '',
-          title: ad.snapshot?.title || '',
-          page_name: ad.pageName || '',
-          ad_archive_id: ad.adArchiveId || ''
-        },
-        status: 'pending' as const
-      }
-    })
-
-    const { data: insertedAds, error: insertError } = await supabase
-      .from('scraped_ads')
-      .insert(scrapedAdRecords)
-      .select()
-
-    if (insertError || !insertedAds) {
-      throw new Error(`Failed to save scraped ads: ${insertError?.message}`)
-    }
-
-    await logInfo(env, jobId, `Saved ${insertedAds.length} scraped ads to database`)
-
-    // Step 3: Process ads in batches
-    await updateJobStatus(env, jobId, 'generating')
-
-    const batchSize = job.batch_size || 5
-    const batches = chunkArray(insertedAds, batchSize)
-
-    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-      const batch = batches[batchIndex]
-      await logInfo(env, jobId, `Processing batch ${batchIndex + 1}/${batches.length}`)
-
-      // Process batch in parallel
-      await Promise.all(
-        batch.map(scrapedAd => processScrapedAd(env, jobId, scrapedAd, job))
-      )
-    }
-
-    // Step 4: Mark job as complete
-    await updateJobStatus(env, jobId, 'done')
-
-    const { data: finalJob } = await supabase
-      .from('jobs')
-      .select('successful_ads, failed_ads')
-      .eq('id', jobId)
-      .single()
-
-    await logInfo(env, jobId, `Job completed! Generated ${finalJob?.successful_ads || 0} ads, ${finalJob?.failed_ads || 0} failed`)
+    await processReferenceAds(env, jobId, job, scrapedAds)
 
   } catch (error: any) {
     await logError(env, jobId, `Job processing failed: ${error.message}`, { error: error.stack })
     await updateJobStatus(env, jobId, 'failed', { error: error.message })
     throw error
   }
+}
+
+/**
+ * Process an existing set of Apify records without starting a new paid actor run.
+ */
+export async function processImportedAds(
+  env: Env,
+  jobId: string,
+  referenceAds: ApifyScrapedAd[]
+): Promise<void> {
+  const supabase = getSupabaseAdminClient(env)
+
+  try {
+    const { data: job, error: jobError } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('id', jobId)
+      .single()
+
+    if (jobError || !job) {
+      throw new Error(`Job not found: ${jobId}`)
+    }
+
+    await logInfo(env, jobId, `Using ${referenceAds.length} imported reference ads; no new Apify run will be started`)
+    await processReferenceAds(env, jobId, job, referenceAds)
+  } catch (error: any) {
+    await logError(env, jobId, `Imported-reference processing failed: ${error.message}`, { error: error.stack })
+    await updateJobStatus(env, jobId, 'failed', { error: error.message })
+    throw error
+  }
+}
+
+/**
+ * Save reference ads, generate branded variations, and mark the job complete.
+ */
+async function processReferenceAds(
+  env: Env,
+  jobId: string,
+  job: Job,
+  referenceAds: ApifyScrapedAd[]
+): Promise<void> {
+  const supabase = getSupabaseAdminClient(env)
+
+  const usableAds = referenceAds
+    .filter(ad => hasReferenceImage(ad))
+    .slice(0, job.max_ads)
+
+  if (usableAds.length === 0) {
+    throw new Error('No reusable reference ads with images were supplied')
+  }
+
+  await logInfo(env, jobId, `Found ${usableAds.length} reference ads to process`)
+
+  await supabase
+    .from('jobs')
+    .update({ total_ads: usableAds.length })
+    .eq('id', jobId)
+
+  const scrapedAdRecords = usableAds.map((ad, index) => ({
+    job_id: jobId,
+    source_image_url: getReferenceImageUrl(ad),
+    position: index,
+    meta: {
+      ad_creative_bodies: ad.ad_creative_bodies || [],
+      ad_creative_link_titles: ad.ad_creative_link_titles || [],
+      body_text: ad.snapshot?.body?.text || '',
+      title: ad.snapshot?.title || '',
+      page_name: ad.pageName || '',
+      ad_archive_id: ad.adArchiveId || '',
+      imported_reference: true
+    },
+    status: 'pending' as const
+  }))
+
+  const { data: insertedAds, error: insertError } = await supabase
+    .from('scraped_ads')
+    .insert(scrapedAdRecords)
+    .select()
+
+  if (insertError || !insertedAds) {
+    throw new Error(`Failed to save scraped ads: ${insertError?.message}`)
+  }
+
+  await logInfo(env, jobId, `Saved ${insertedAds.length} reference ads to database`)
+  await updateJobStatus(env, jobId, 'generating')
+
+  const batchSize = job.batch_size || 5
+  const batches = chunkArray(insertedAds, batchSize)
+
+  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+    const batch = batches[batchIndex]
+    await logInfo(env, jobId, `Processing batch ${batchIndex + 1}/${batches.length}`)
+    await Promise.all(batch.map(scrapedAd => processScrapedAd(env, jobId, scrapedAd, job)))
+  }
+
+  await updateJobStatus(env, jobId, 'done')
+
+  const { data: finalJob } = await supabase
+    .from('jobs')
+    .select('successful_ads, failed_ads')
+    .eq('id', jobId)
+    .single()
+
+  await logInfo(env, jobId, `Job completed! Generated ${finalJob?.successful_ads || 0} ads, ${finalJob?.failed_ads || 0} failed`)
+}
+
+function getReferenceImageUrl(ad: ApifyScrapedAd): string {
+  const firstImage = ad.snapshot?.images?.[0]
+  return firstImage?.originalImageUrl || firstImage?.resizedImageUrl || firstImage?.imageUrl || ad.original_image_url || ad.resized_image_url || ''
+}
+
+function hasReferenceImage(ad: ApifyScrapedAd): boolean {
+  return Boolean(getReferenceImageUrl(ad))
 }
 
 /**
