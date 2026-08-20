@@ -1,7 +1,7 @@
 import type { Env } from '../types'
 import { getSupabaseAdminClient } from './supabase'
 
-const BUCKET_NAME = 'ad-thief-images'
+const BUCKET_NAME = 'ad-thief'
 
 /**
  * Upload image to Supabase Storage
